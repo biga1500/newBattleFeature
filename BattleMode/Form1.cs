@@ -41,6 +41,9 @@ namespace WindowsFormsApp1
 
         public int x = 0;
         public int y = 0;
+      
+        public int scrollBattlePosX = 0;
+        public int scrollBattlePosY = 0;
         public string monsterName = "";
         Monster m = new Monster();
 
@@ -53,12 +56,12 @@ namespace WindowsFormsApp1
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            
+
             CreateMonsters();
             Bitmap battleIconH = (Bitmap)Bitmap.FromFile(@"C:\Users\Biga\Desktop\battle-master\BattleMode\BattleMode\img\BATTLEICONH.jpg");
             Bitmap battleIconL = (Bitmap)Bitmap.FromFile(@"C:\Users\Biga\Desktop\battle-master\BattleMode\BattleMode\img\BATTLEICONL.jpg");
             Bitmap battleIconLowOpen = (Bitmap)Bitmap.FromFile(@"C:\Users\Biga\Desktop\battle-master\BattleMode\BattleMode\img\battleNotOpenedLowResolution.jpg");
-
+          
             Process cointainsProcess = Process.GetProcessesByName("client").FirstOrDefault();
 
             while (cointainsProcess != null)
@@ -67,17 +70,17 @@ namespace WindowsFormsApp1
                 printImageScreen();
 
                 //verify if battle high resolution is opened
-                if (verifyImage(ConvertToFormat(printImageScreen(), battleIconH.PixelFormat), battleIconH))
+                if (verifyImage(ConvertToFormat(printImageScreen(), battleIconH.PixelFormat), battleIconH, ""))
                 {
                     attackProcess(cointainsProcess);
                 }
                 //verify if battle low resolution is opened
-                else if (verifyImage(ConvertToFormat(printImageScreen(), battleIconL.PixelFormat), battleIconL))
+                else if (verifyImage(ConvertToFormat(printImageScreen(), battleIconL.PixelFormat), battleIconL, ""))
                 {
                     attackProcess(cointainsProcess);
                 }
                 //open battle
-                else if(verifyImage(ConvertToFormat(printImageScreen(), battleIconLowOpen.PixelFormat), battleIconLowOpen))
+                else if (verifyImage(ConvertToFormat(printImageScreen(), battleIconLowOpen.PixelFormat), battleIconLowOpen, ""))
                 {
                     Point p = new Point(x - 10, y + 10);
                     int position = ((p.Y << 0x10) | (p.X & 0xFFFF));
@@ -92,36 +95,100 @@ namespace WindowsFormsApp1
 
         public void attackProcess(Process cointainsProcess)
         {
-        
+            int countAttackTime = 0;
             do
             {
+
                 if (haveMonster())
                 {
                     var imageToGetText = getBattlePrint();
-
-                    RecognizeGoogleApi(imageToGetText);
-                    
-                    if (m.checkMonster(monsterName))
+                    if (!scrollBattleExists(imageToGetText))
                     {
-                        //if determinado pixel dentro do battle estiver vermelho, não faz nada abaixo
+                        if (countAttackTime > 0)
+                        {
+                            countAttackTime = 0;
+                            break;
+                        }                       
+                        RecognizeGoogleApi(imageToGetText);
+                        var monsterPosition = m.checkMonster(monsterName);
                         if (!isAttacking())
-                        {                
-                            Point p = new Point(x + 87, y + 25);                
+                        {
+                            if (monsterPosition != 0)
+                            {
+                                int newYPos = y + (monsterPosition * 21);
+                                countAttackTime++;
 
-                            int position = ((p.Y << 0x10) | (p.X & 0xFFFF));
+                                Point p = new Point(x + 87, newYPos);
+                                int position = ((p.Y << 0x10) | (p.X & 0xFFFF));
 
-                            IntPtr handle = FindWindow(null, cointainsProcess.MainWindowTitle);
 
-                            // Send the click message                      
+                                IntPtr handle = FindWindow(null, cointainsProcess.MainWindowTitle);
 
-                            PostMessage(handle, MOUSEEVENTF_LEFTDOWN, new IntPtr(0x01), new IntPtr(position));
-                            PostMessage(handle, MOUSEEVENTF_LEFTUP, new IntPtr(0), new IntPtr(position));
+                                // Send the click message                      
+
+                                PostMessage(handle, MOUSEEVENTF_LEFTDOWN, new IntPtr(0x01), new IntPtr(position));
+                                PostMessage(handle, MOUSEEVENTF_LEFTUP, new IntPtr(0), new IntPtr(position));
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (countAttackTime > 0)
+                        {
+                            countAttackTime = 0;
+                            break;
+                        }
+                        RecognizeGoogleApi(imageToGetText);
+                        var monsterPosition = m.checkMonster(monsterName);
+                        if (!isAttacking())
+                        {
+                            if (monsterPosition != 0)
+                            {
+                                countAttackTime++;
+                                int newYPos = y + (monsterPosition * 17); 
+                                Point p = new Point(x + 87, newYPos);
+                                int position = ((p.Y << 0x10) | (p.X & 0xFFFF));
+                                IntPtr handle = FindWindow(null, cointainsProcess.MainWindowTitle);
+                                PostMessage(handle, MOUSEEVENTF_LEFTDOWN, new IntPtr(0x01), new IntPtr(position));
+                                PostMessage(handle, MOUSEEVENTF_LEFTUP, new IntPtr(0), new IntPtr(position));
+                            }
+                            else
+                            {
+                                Point p = new Point(x + scrollBattlePosX + 15, y + scrollBattlePosY + 15);
+
+                                int position = ((p.Y << 0x10) | (p.X & 0xFFFF));
+
+                                IntPtr handle = FindWindow(null, cointainsProcess.MainWindowTitle);
+
+                                PostMessage(handle, MOUSEEVENTF_LEFTDOWN, new IntPtr(0x01), new IntPtr(position));
+                                PostMessage(handle, MOUSEEVENTF_LEFTUP, new IntPtr(0), new IntPtr(position));
+                            }
+                           
                         }
                     }
                 }
             } while (true);
         }
 
+        private bool scrollBattleExists(Bitmap battleRetangle)
+        {
+            var pos = findBattleBorder();
+            Bitmap scrollBattlelDL = (Bitmap)Bitmap.FromFile(@"C:\Users\Biga\Desktop\battle-master\BattleMode\BattleMode\img\scrollBattleImageDownLowResolution.jpg");
+            Bitmap scrollBattleUL = (Bitmap)Bitmap.FromFile(@"C:\Users\Biga\Desktop\battle-master\BattleMode\BattleMode\img\scrollBattleImageUpLowResolution.jpg");
+            Rectangle rectCropArea = new Rectangle(x + 10, y + 10, pos.X, pos.Y);
+                if (new prjTools.ScreenShot().GetWindowPictureFromRectangle(rectCropArea).GetPixel(146, 16).R == 53)
+                {
+                    return false;
+                }
+                else if (verifyImage(ConvertToFormat(battleRetangle, scrollBattleUL.PixelFormat), scrollBattleUL, "FindScroll"))
+                {
+                    return true;
+                }
+            
+           
+          
+            return true;
+        }
         public async void RecognizeGoogleApi(Bitmap imageToGetText)
         {
             Annotate annotate = new Annotate();
@@ -139,21 +206,26 @@ namespace WindowsFormsApp1
 
             }
         }
-
-        private bool haveMonster(){           
-            Bitmap verifyBattle = printImageScreen();
-            if (verifyBattle.GetPixel(x + 10, y + 60).R.Equals(73) && verifyBattle.GetPixel(x + 10, y + 60).G.Equals(73) && verifyBattle.GetPixel(x + 10, y + 60).B.Equals(73))
+        private bool haveMonster()
+        {
+            Bitmap verifyBattle = getBattlePrint();
+            int count = 0;
+            for(int j = 0; j< verifyBattle.Height; j++)
+            {
+                if (verifyBattle.GetPixel(13, j).R.Equals(74) && verifyBattle.GetPixel(13, j).G.Equals(74) && verifyBattle.GetPixel(13, j).B.Equals(74))
+                    count++;
+            }
+            if (count > 30)
                 return false;
+            
+           
+       
             return true;
         }
-
         private Bitmap getBattlePrint()
         {
             var pos = findBattleBorder();
-            Rectangle rectCropArea = new Rectangle(x, y + 10, pos.X, pos.Y);
-            if (new prjTools.ScreenShot().GetWindowPictureFromRectangle(rectCropArea).GetPixel(156, 16).R == 53){
-                //tem rolagem
-            }
+            Rectangle rectCropArea = new Rectangle(x+10, y + 10, pos.X, pos.Y);
             new prjTools.ScreenShot().GetWindowPictureFromRectangle(rectCropArea).Save(@"C:\Users\Biga\Desktop\testretangle.jpg", ImageFormat.Jpeg);//tirar dps
             return new prjTools.ScreenShot().GetWindowPictureFromRectangle(rectCropArea);
         }
@@ -175,7 +247,6 @@ namespace WindowsFormsApp1
                             }
                             if (contador > 160)
                             {
-
                                 int width = i - x;
                                 int height = j - y;
                                 Point p = new Point(width, height);
@@ -190,27 +261,27 @@ namespace WindowsFormsApp1
             {
 
             }
-           
+
             Point p1 = new Point(0, 0);
             return p1;
         }
         private bool isAttacking()
         {
-            Rectangle crop = new Rectangle(x, y, 100, 200);
+            var print = getBattlePrint();
+            
 
-            var bmp = new Bitmap(crop.Width, crop.Height);
-            using (var gr = Graphics.FromImage(bmp))
+            for (int j = 0; j < print.Height; j++)
             {
-                gr.DrawImage(printImageScreen(), new Rectangle(0, 0, bmp.Width, bmp.Height), crop, GraphicsUnit.Pixel);
+                var x1 = print.GetPixel(8, j).R;
+                var x2 = print.GetPixel(8, j).G;
+                var x3 = print.GetPixel(8, j).B;
+                if (print.GetPixel(8, j).R.Equals(255) && print.GetPixel(8, j).G.Equals(0) && print.GetPixel(8, j).B.Equals(0))
+                    return true;
             }
-
-            if (bmp.GetPixel(24, 73).R.Equals(237) && bmp.GetPixel(24, 73).G.Equals(8) && bmp.GetPixel(24, 73).B.Equals(8))
-                return true;
             return false;
         }
         private void CreateMonsters()
         {
-            m.addMonster("Rat");
             m.addMonster("Cave Rat");
         }
         private Bitmap printImageScreen()
@@ -228,8 +299,9 @@ namespace WindowsFormsApp1
             }
             return copy;
         }
-        private bool verifyImage(Bitmap sourceImage, Bitmap template){            
-            
+        private bool verifyImage(Bitmap sourceImage, Bitmap template, string typeFormat)
+        {
+
             // create template matching algorithm's instance
             // (set similarity threshold to 92.1%)
 
@@ -239,17 +311,28 @@ namespace WindowsFormsApp1
             TemplateMatch[] matchings = tm.ProcessImage(sourceImage, template);
             // highlight found matchings
 
-            if(matchings.Length == 0)
-                return false;   
-            
+            if (matchings.Length == 0)
+                return false;
+
             BitmapData data = sourceImage.LockBits(
             new Rectangle(0, 0, sourceImage.Width, sourceImage.Height),
             ImageLockMode.ReadWrite, sourceImage.PixelFormat);
             foreach (TemplateMatch m in matchings)
             {
                 Drawing.Rectangle(data, m.Rectangle, System.Drawing.Color.White);
-                x = m.Rectangle.Location.X;
-                y = m.Rectangle.Location.Y ;
+                if (typeFormat == "FindScroll")
+                {
+                    scrollBattlePosX = m.Rectangle.Location.X;
+                    scrollBattlePosY = m.Rectangle.Location.Y;
+
+                }
+                else
+                {
+                     x = m.Rectangle.Location.X;
+                     y = m.Rectangle.Location.Y;
+                }
+            
+                               
             }
             // do something else with matching
             sourceImage.UnlockBits(data);
@@ -258,3 +341,5 @@ namespace WindowsFormsApp1
         }
     }
 }
+   
+

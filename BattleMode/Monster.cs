@@ -18,7 +18,7 @@ namespace WindowsFormsApp1
             mnsterList.Add(m);
         }
 
-        public bool checkMonster(string nameMonster)
+        public int checkMonster(string nameMonster)
         {
             string[] a = nameMonster.Split(';');
             foreach (Monster monster in mnsterList)
@@ -27,12 +27,12 @@ namespace WindowsFormsApp1
                 {
                     if (monster.nameMonster == a[i])
                     {
-                        return true;
+                        
+                        return i+1;
                     }
-                }
-               
+                }               
             }
-            return false;
+            return 0;
         }
     }
 }
